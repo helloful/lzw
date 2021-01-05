@@ -222,7 +222,7 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
   
 
     // create 2D sqrt(p) x sqrt(p) grid communicator
- 
+    int i;
     int N = A->N;
     double* global_A=(double*)malloc(sizeof(double) * N*N);
     double* global_B = (double*)malloc(sizeof(double) * N*N);
@@ -237,7 +237,7 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
     }
     MPI_Barrier(MPI_COMM_WORLD);
     Cannon(N,global_A, global_B, global_C);
-    int i;
+    
     if (my_id == 0) {
         for (i = 0; i < N * N; i++) {
             C->data[i] += global_C[i];
