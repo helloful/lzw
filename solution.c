@@ -49,7 +49,7 @@ int MatMult(Mat A, Vec x, Vec y)
     int myCol = myid % p;
     for (i = 0; i < p; i++) {
         MPI_Send(A->data, A->n * A->n, MPI_DOUBLE, myRow * p + i, 1, MPI_COMM_WORLD);
-        MPI_Send(x->data, x->n , MPI_DOUBLE, myRow * p + 1, 2, MPI_COMM_WORLD);
+        MPI_Send(x->data, x->n , MPI_DOUBLE, myRow * p + i, 2, MPI_COMM_WORLD);
 
         MPI_Send(A->data, A->n * A->n, MPI_DOUBLE, i * p + myCol, 1, MPI_COMM_WORLD);
         MPI_Send(x->data, x->n, MPI_DOUBLE, i * p + myCol, 2, MPI_COMM_WORLD);
@@ -66,7 +66,7 @@ int MatMult(Mat A, Vec x, Vec y)
     for (i = 0; i < p; i++) {
         MPI_Recv(recvA, A->n * A->n, MPI_DOUBLE, myRow * p + i, 1, MPI_COMM_WORLD, &status);
         MPI_Recv(recvx, x->n, MPI_DOUBLE, i * p + myCol, 2, MPI_COMM_WORLD, &status);
-        MatrixMultiply(recvA, recvB, resulty, A->n, A->n, 1);
+        MatrixMultiply(recvA, recvx, resultC, A->n, A->n, 1);
         MatrixAdd(y->data, resultC, A->n, 1);
     }
   
@@ -104,7 +104,7 @@ int MatMatMultSumma(Mat A, Mat B, Mat C)
   int myCol = myid % p;
   for (i = 0; i < p; i++) {
       MPI_Send(A->data, A->n * A->n, MPI_DOUBLE, myRow * p + i, 1, MPI_COMM_WORLD);
-      MPI_Send(B->data, B->n * B->n, MPI_DOUBLE, myRow * p + 1, 2, MPI_COMM_WORLD);
+      MPI_Send(B->data, B->n * B->n, MPI_DOUBLE, myRow * p + i, 2, MPI_COMM_WORLD);
 
       MPI_Send(A->data, A->n * A->n, MPI_DOUBLE, i * p + myCol, 1, MPI_COMM_WORLD);
       MPI_Send(B->data, B->n * B->n, MPI_DOUBLE, i * p + myCol, 2, MPI_COMM_WORLD);
