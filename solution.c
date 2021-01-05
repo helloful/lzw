@@ -146,7 +146,7 @@ void cannon(double* A, double* buf_A, int buf_A_size, double* B, double* buf_B, 
 }
 int MatMatMultCannon(Mat A, Mat B, Mat C)
 {
-    int ierr;
+    int ierri,i,j;
     fprintf(stderr, "[MatMatMultCannon]: TODO, please implement me.\n");
     
     int num_proc, myid;
@@ -169,6 +169,23 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
     int buf_A_size = A->n * A->n;
     int buf_B_size = B->n * B->n;
     int buf_C_size = C->n * C->n;
+
+    printf("I am proc %d\n",myid);
+    for(i=0;i<n;i++){
+        printf("%d:      ",myid);
+        for(j=0;j<n;j++){
+            printf("%d  ",A->data[i*n+j]);
+        }
+        printf("\n");
+    }
+    printf("I am proc %d\n",myid);
+    for(i=0;i<n;i++){
+        printf("%d:      ",myid);
+        for(j=0;j<n;j++){
+            printf("%d ",B->data[i*n+j]);
+        }
+        printf("\n");
+    }
     /*compute C=A*B by Cannon algorithm*/
      /*矩阵块必须定位对齐，先做预处理*/
     shuffle(A->data, buf_A, buf_A_size, B->data, buf_B, buf_B_size, root, myid);
