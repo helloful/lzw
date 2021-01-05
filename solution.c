@@ -96,7 +96,7 @@ void shuffle(double* A, double* buf_A, int buf_A_size, double* B, double* buf_B,
         MPI_Sendrecv(B, buf_B_size, MPI_DOUBLE, get_index(cur_row - 1, cur_col, root), 103,buf_B, buf_B_size, MPI_DOUBLE, get_index(cur_row + 1, cur_col, root), 103, MPI_COMM_WORLD, &status);
         memcpy(B, buf_B, buf_B_size * sizeof(double));/*buf_B用于通信时缓存矩阵*/
         memset(buf_B, 0, buf_B_size * sizeof(double));
-    }
+    } 
     /*printf("I have shuffled!\n");*/
 }
 /*计算矩阵乘法，将结果存入C中*/
@@ -118,8 +118,8 @@ void matrix_multi(double* A, double* B, double* C, int n1, int n2, int n3, int m
 }
 void cannon(double* A, double* buf_A, int buf_A_size, double* B, double* buf_B, int buf_B_size,
     double* C, int buf_C_size, int row_a, int col_a, int col_b, int root, int myid) {
-    MPI_Status status;
     
+    MPI_Status status;
     int i, j;
     //memset(C, 0, sizeof(double) * buf_C_size);
     int cur_col = 0;
@@ -161,8 +161,8 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
     }
     
     double * buf_A, * buf_B;
-    buf_A = (double*)malloc(sizeof(double) * A->n*A->n);
-    buf_B = (double*)malloc(sizeof(double) * B->n * B->n);
+    buf_A = (double*)malloc(sizeof(double) *n*n);
+    buf_B = (double*)malloc(sizeof(double) *n*n);
     if (buf_A == NULL || buf_B == NULL) {
         printf("Memory allocation failed!\n");
         return 0;
@@ -171,17 +171,19 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
     int buf_B_size = B->n * B->n;
     int buf_C_size = C->n * C->n;
 
-    /*compute C=A*B by Cannon algorithm*/
+    /*compute C=C+A*B by Cannon algorithm*/
      /*矩阵块必须定位对齐，先做预处理*/
+    MPI_Barrier(MPI_COMM_WORLD);
     shuffle(A->data, buf_A, buf_A_size, B->data, buf_B, buf_B_size, root, myid);
-    MPI_Barrier(MPI_COMM_WORLD);/*等待所有进程完成cannon算法,*/
+    //MPI_Barrier(MPI_COMM_WORLD);/*等待所有进程完成cannon算法,*/
     
     /*包含cannon全部内容*/
     cannon(A->data, buf_A, buf_A_size, B->data, buf_B, buf_B_size, C->data, buf_C_size, A->n, A->n, B->n, root, myid);
    
-    MPI_Barrier(MPI_COMM_WORLD);/*等待所有进程完成cannon算法,*/
+   
     free(buf_B);
     free(buf_A);
+    MPI_Barrier(MPI_COMM_WORLD);/*等待所有进程完成cannon算法,*/
     
     
     /* Do local part of multiplication. Only correct in serial. */
