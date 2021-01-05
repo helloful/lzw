@@ -29,6 +29,20 @@ int MatMult(Mat A, Vec x, Vec y)
   return 0;
 }
 
+void naive_multiply_add(int size, double* A, double* B, double* C)
+{
+    int i, j, k;
+    for (i = 0; i < size; ++i) {
+        for (j = 0; j < size; ++j) {
+            double s = 0;
+            for (k = 0; k < size; ++k) {
+                s += A[i * size + k] * B[k * size + j];
+            }
+            C[i * size + j] += s;
+        }
+    }
+}
+void MatrixMultiply()
 /* C <- AB + C using the SUMMA algorithm.
  *
  * - A: input matrix
@@ -37,10 +51,36 @@ int MatMult(Mat A, Vec x, Vec y)
  */
 int MatMatMultSumma(Mat A, Mat B, Mat C)
 {
-  int ierr;
-  fprintf(stderr, "[MatMatMultSumma]: TODO, please implement me.\n");
-  /* Do local part of multiplication. Only correct in serial. */
-  ierr = MatMatMultLocal(A->n, A->data, B->data, C->data);CHKERR(ierr);
+  int num_proc, myid;
+  MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
+  MPI_Comm_rank(MPI_COMM_WORLD, &myid);
+  int i, j, k;
+  int p = A->np;
+  int myRow = myid / p;
+  int myCol = myid % p;
+  for (i = 0; i < p; i++) {
+      MPI_Send(A->data, A->n * A->n, MPI_DOUBLE, myRow * p + i, 1, MPI_COMM_WORLD);
+      MPI_Send(B->data, B->n * B->n, MPI_DOUBLE, myRow * p + 1, 2, MPI_COMM_WORLD);
+
+      MPI_Send(A->data, A->n * A->n, MPI_DOUBLE, i * p + myCol, 1, MPI_COMM_WORLD);
+      MPI_Send(B->data, B->n * B->n, MPI_DOUBLE, i * p + myCol, 2, MPI_COMM_WORLD);
+
+  }
+  double* recvA = (double*)malloc(sizeof(double) * A->n * A->n);
+  double* recvB = (double*)malloc(sizeof(double) * B->n * B->n);
+  double* resultC = (double*)malloc(sizeof(double) * C->n * C->n);
+
+  for (i = 0; i < A->n * B->n; i++) {
+      resultC[i] = 0;
+  }
+  //计算矩阵的值
+  for (i = 0; i < p; i++) {
+      MPI_Recv(recvA, A->n * A->n, MPI_DOUBLE, myRow * *p + i, 1, MPI_COMM_WORLD);
+      MPI_Recv(recvB, B->n * B->n, MPI_Sendrecv, i * p + myCol, 2, MPI_COMM_WORLD);
+
+      naive_multiply_add(A->n, recvA, recvB, C->data);
+
+  }
   return 0;
 }
 
@@ -50,19 +90,7 @@ int MatMatMultSumma(Mat A, Mat B, Mat C)
  * - B: input matrix
  * - C: output matrix
  */
-void naive_multiply_add(int size, double* A, double* B, double* C)
-{
-    int i, j, k;
-    for ( i = 0; i < size; ++i) {
-        for ( j = 0; j < size; ++j) {
-            double s = 0;
-            for ( k = 0; k < size; ++k) {
-                s += A[i * size + k] * B[k * size + j];
-            }
-            C[i * size + j] += s;
-        }
-    }
-}
+
 /*
  *@row:矩阵所在的行
  *@col:矩阵所在的列
