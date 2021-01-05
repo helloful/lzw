@@ -70,7 +70,7 @@ void naive_multiply_add(int size, double* A, double* B, double* C)
  *@return 根据行列号计算进程实际编号
 */
 int get_index(int row, int col, int sp) {
-    int tmp = ((row + sp) % sp) * sp + (col + sp) % sp;
+    int tmp = ((row + sp) % sp) * sp + ((col + sp) % sp);
     return tmp;
 }
 /*用于矩阵下标定位对齐*/
@@ -104,7 +104,6 @@ void matrix_multi(double* A, double* B, double* C, int n1, int n2, int n3, int m
     int i = 0, j = 0, k = 0;
     double* tmp_C = (double*)malloc(n1 * n3 * sizeof(double));
     memset(tmp_C, 0, sizeof(double) * n1 * n3);
-
     for (i = 0; i < n1; i++) {
         for (j = 0; j < n3; j++) {
             for (k = 0; k < n2; k++) {
@@ -114,14 +113,15 @@ void matrix_multi(double* A, double* B, double* C, int n1, int n2, int n3, int m
         }
 
     }
+    free(tmp_C);
 
 }
 void cannon(double* A, double* buf_A, int buf_A_size, double* B, double* buf_B, int buf_B_size,
     double* C, int buf_C_size, int row_a, int col_a, int col_b, int root, int myid) {
     MPI_Status status;
-    double elapsed_time, multiply_time = 0, passdata_time = 0;
+    
     int i, j;
-    memset(C, 0, sizeof(double) * buf_C_size);
+    //memset(C, 0, sizeof(double) * buf_C_size);
     int cur_col = 0;
     int cur_row = 0;
     /*通过进程编号计算获得当前进程所在的行号和列号*/
@@ -130,7 +130,6 @@ void cannon(double* A, double* buf_A, int buf_A_size, double* B, double* buf_B, 
 
     for (i = 0; i < root; i++) {/*一共需要循环root次，root=sqrt(nprocs)*/
         matrix_multi(A, B, C, row_a, col_a, col_b, myid);/*计算矩阵乘法*/
- 
         /*接收来自右边(row,col+1)的数据，并将当前矩阵发送给左边(row,col-1)的进程*/
         MPI_Sendrecv(A, buf_A_size, MPI_DOUBLE, get_index(cur_row, cur_col - 1, root), 102,
             buf_A, buf_A_size, MPI_DOUBLE, get_index(cur_row, cur_col + 1, root), 102, MPI_COMM_WORLD, &status);
@@ -143,27 +142,9 @@ void cannon(double* A, double* buf_A, int buf_A_size, double* B, double* buf_B, 
 
     }
     /*将计算结果发送给数组C*/
-    MPI_Send(C, row_a * col_b, MPI_DOUBLE, 0, 104, MPI_COMM_WORLD);
+    //MPI_Send(C, row_a * col_b, MPI_DOUBLE, 0, 104, MPI_COMM_WORLD);
 }
-void finalCannon(double* C, int rank, int n,int np,int size)
-{
-    int rank;
-    int process_row, process_col;
-    process_row = rank / np;
-    process_col = rank % np;
 
-    double expect = 0;
-    for (int i = 0; i < np; i++) {
-        expect += (i + 1 + process_row * np) * (size - i * np - process_col);
-    }
-    expect *= n;
-    expect += size * rank + rank;
-    for (int i = 0; i < C->n; i++) {
-        for (int j = 0; j < C->n; j++) {
-            C[i * n + j] = expect;
-        }
-    }
-}
 int MatMatMultCannon(Mat A, Mat B, Mat C)
 {
     int ierr,i,j;
@@ -173,7 +154,7 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
     MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
     int n = A->n;
-    int root = sqrt(num_proc);
+    int root = A->np;
     if (root * root != num_proc) {
         printf("process number must be a squre!\n");
         return 0;
@@ -190,35 +171,18 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
     int buf_B_size = B->n * B->n;
     int buf_C_size = C->n * C->n;
 
-    /*printf("I am proc %d\n",myid);
-    for(i=0;i<n;i++){
-        printf("%d:      ",myid);
-        for(j=0;j<n;j++){
-            printf("%lf  ",A->data[i*n+j]);
-        }
-        printf("\n");
-    }
-    printf("I am proc %d\n",myid);
-    for(i=0;i<n;i++){
-        printf("%d:      ",myid);
-        for(j=0;j<n;j++){
-            printf("%lf ",B->data[i*n+j]);
-        }
-        printf("\n");
-    }*/
     /*compute C=A*B by Cannon algorithm*/
      /*矩阵块必须定位对齐，先做预处理*/
     shuffle(A->data, buf_A, buf_A_size, B->data, buf_B, buf_B_size, root, myid);
+    MPI_Barrier(MPI_COMM_WORLD);/*等待所有进程完成cannon算法,*/
     
     /*包含cannon全部内容*/
     cannon(A->data, buf_A, buf_A_size, B->data, buf_B, buf_B_size, C->data, buf_C_size, A->n, A->n, B->n, root, myid);
-    MPI_Barrier(MPI_COMM_WORLD);
-
-
-    MPI_Barrier(MPI_COMM_WORLD);/*等待所有进程完成cannon算法，将结果发送给进程0*/
+   
+    MPI_Barrier(MPI_COMM_WORLD);/*等待所有进程完成cannon算法,*/
     free(buf_B);
     free(buf_A);
-    finalCannon(C->data, myid, C->n, C->np, num_proc);
+    
     
     /* Do local part of multiplication. Only correct in serial. */
     ierr = MatMatMultLocal(A->n, A->data, B->data, C->data); CHKERR(ierr);
