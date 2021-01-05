@@ -174,25 +174,60 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
     /*compute C=C+A*B by Cannon algorithm*/
      /*矩阵块必须定位对齐，先做预处理*/
     MPI_Barrier(MPI_COMM_WORLD);
-    print("my id:%d\n",myid);
-    printf("%dA:",myid);
-    int k = 0;
-    for (i = 0; i < n; i++) {
-        for (j = 0; j < n; j++) {
-            printf("%lf\t",A->data[k++]);
+    if (myid == 1) {
+        printf("my id:%d\n", myid);
+        printf("A:", myid);
+        int k = 0;
+        for (i = 0; i < n; i++) {
+            for (j = 0; j < n; j++) {
+                printf("%lf\t", A->data[k++]);
+            }
+            printf("\n");
         }
-        printf("\n")
-    }
-    printf("%dB:", myid);
-    k = 0;
-    for (i = 0; i < n; i++) {
-        for (j = 0; j < n; j++) {
-            printf("%lf\t", B->data[k++]);
+        printf("B:", myid);
+        k = 0;
+        for (i = 0; i < n; i++) {
+            for (j = 0; j < n; j++) {
+                printf("%lf\t", B->data[k++]);
+            }
+            printf("\n");
         }
-        printf("\n")
+        k = 0;
+        for (i = 0; i < n; i++) {
+            for (j = 0; j < n; j++) {
+                printf("%lf\t", C->data[k++]);
+            }
+            printf("\n");
+        }
     }
     shuffle(A->data, buf_A, buf_A_size, B->data, buf_B, buf_B_size, root, myid);
     //MPI_Barrier(MPI_COMM_WORLD);/*等待所有进程完成cannon算法,*/
+    if (myid == 1) {
+        printf("交换完成:%d\n", myid);
+        printf("A:", myid);
+        int k = 0;
+        for (i = 0; i < n; i++) {
+            for (j = 0; j < n; j++) {
+                printf("%lf\t", A->data[k++]);
+            }
+            printf("\n");
+        }
+        printf("B:", myid);
+        k = 0;
+        for (i = 0; i < n; i++) {
+            for (j = 0; j < n; j++) {
+                printf("%lf\t", B->data[k++]);
+            }
+            printf("\n");
+        }
+        k = 0;
+        for (i = 0; i < n; i++) {
+            for (j = 0; j < n; j++) {
+                printf("%lf\t", C->data[k++]);
+            }
+            printf("\n");
+        }
+    }
     
     /*包含cannon全部内容*/
     cannon(A->data, buf_A, buf_A_size, B->data, buf_B, buf_B_size, C->data, buf_C_size, A->n, A->n, B->n, root, myid);
