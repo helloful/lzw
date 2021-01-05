@@ -151,7 +151,7 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
     
     int num_proc, myid;
     MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
-    MPI_Comm_rank(MPI_COMM_WORLD, &my_id);
+    MPI_Comm_rank(MPI_COMM_WORLD, &myid);
     int n = A->n;
     int root = sqrt(num_proc);
     if (root * root != num_proc) {
@@ -168,7 +168,7 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
     }
     int buf_A_size = A->n * A->n;
     int buf_B_size = B->n * B->n;
-    int buf_B_size = C->n * C->n;
+    int buf_C_size = C->n * C->n;
     /*compute C=A*B by Cannon algorithm*/
      /*矩阵块必须定位对齐，先做预处理*/
     shuffle(A->data, buf_A, buf_A_size, B->data, buf_B, buf_B_size, root, myid);
