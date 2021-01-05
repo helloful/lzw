@@ -237,7 +237,7 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
     }
     k = 0;
     if (my_id == 0) {
-        printf("A matrix\n");
+        /*printf("A matrix\n");
         for (i = 0; i < N; i++) {
             for (j = 0; j < N; j++) {
                 printf("%lf\t",A->data[k++]);
@@ -259,7 +259,7 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
                 printf("%lf\t", C->data[k++]);
             }
             printf("\n");
-        }
+        }*/
     }
     MPI_Barrier(MPI_COMM_WORLD);
     Cannon(N,global_A, global_B, global_C);
@@ -270,16 +270,16 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
             C->data[i] += global_C[i];
         }
         k = 0;
-        printf("C2 matix:\n");
+      /*  printf("C2 matix:\n");
         for (i = 0; i < N; i++) {
             for (j = 0; j < N; j++) {
                 printf("%lf\t", C->data[k++]);
             }
             printf("\n");
-        }
+        }*/
     }
     
- 
+    MPI_Barrier(grid_comm);
     /* Do local part of multiplication. Only correct in serial. */
     ierr = MatMatMultLocal(A->n, A->data, B->data, C->data); CHKERR(ierr);
     return 0;
