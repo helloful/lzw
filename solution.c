@@ -174,6 +174,23 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
     /*compute C=C+A*B by Cannon algorithm*/
      /*矩阵块必须定位对齐，先做预处理*/
     MPI_Barrier(MPI_COMM_WORLD);
+    print("my id:%d\n",myid);
+    printf("%dA:",myid);
+    int k = 0;
+    for (i = 0; i < n; i++) {
+        for (j = 0; j < n; j++) {
+            printf("%lf\t",A->data[k++]);
+        }
+        printf("\n")
+    }
+    printf("%dB:", myid);
+    k = 0;
+    for (i = 0; i < n; i++) {
+        for (j = 0; j < n; j++) {
+            printf("%lf\t", B->data[k++]);
+        }
+        printf("\n")
+    }
     shuffle(A->data, buf_A, buf_A_size, B->data, buf_B, buf_B_size, root, myid);
     //MPI_Barrier(MPI_COMM_WORLD);/*等待所有进程完成cannon算法,*/
     
