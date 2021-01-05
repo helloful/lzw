@@ -81,7 +81,8 @@ void shuffle(double* A, double* buf_A, int buf_A_size, double* B, double* buf_B,
     int cur_row = 0;
     /*通过进程编号计算获得当前进程所在的行号和列号*/
     cur_row = myid / root;
-    cur_col = myid - cur_row * root;
+    //cur_col = myid - cur_row * root;
+    cur_col = myid%root;
     /*对于矩阵A，第i行的矩阵需要向左平移i次*/
     for (i = 0; i < cur_row; i++) {
         /*接收来自右边的数据，并将当前矩阵发送给左边的进程*/
@@ -144,9 +145,28 @@ void cannon(double* A, double* buf_A, int buf_A_size, double* B, double* buf_B, 
     /*将计算结果发送给数组C*/
     MPI_Send(C, row_a * col_b, MPI_DOUBLE, 0, 104, MPI_COMM_WORLD);
 }
+void finalCannon(double* C, int rank, int n,int np,int size)
+{
+    int rank;
+    int process_row, process_col;
+    process_row = rank / np;
+    process_col = rank % np;
+
+    double expect = 0;
+    for (int i = 0; i < np; i++) {
+        expect += (i + 1 + process_row * np) * (size - i * np - process_col);
+    }
+    expect *= n;
+    expect += size * rank + rank;
+    for (int i = 0; i < C->n; i++) {
+        for (int j = 0; j < C->n; j++) {
+            C[i * n + j] = expect;
+        }
+    }
+}
 int MatMatMultCannon(Mat A, Mat B, Mat C)
 {
-    int ierri,i,j;
+    int ierr,i,j;
     fprintf(stderr, "[MatMatMultCannon]: TODO, please implement me.\n");
     
     int num_proc, myid;
@@ -170,11 +190,11 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
     int buf_B_size = B->n * B->n;
     int buf_C_size = C->n * C->n;
 
-    printf("I am proc %d\n",myid);
+    /*printf("I am proc %d\n",myid);
     for(i=0;i<n;i++){
         printf("%d:      ",myid);
         for(j=0;j<n;j++){
-            printf("%d  ",A->data[i*n+j]);
+            printf("%lf  ",A->data[i*n+j]);
         }
         printf("\n");
     }
@@ -182,10 +202,10 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
     for(i=0;i<n;i++){
         printf("%d:      ",myid);
         for(j=0;j<n;j++){
-            printf("%d ",B->data[i*n+j]);
+            printf("%lf ",B->data[i*n+j]);
         }
         printf("\n");
-    }
+    }*/
     /*compute C=A*B by Cannon algorithm*/
      /*矩阵块必须定位对齐，先做预处理*/
     shuffle(A->data, buf_A, buf_A_size, B->data, buf_B, buf_B_size, root, myid);
@@ -198,6 +218,8 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
     MPI_Barrier(MPI_COMM_WORLD);/*等待所有进程完成cannon算法，将结果发送给进程0*/
     free(buf_B);
     free(buf_A);
+    finalCannon(C->data, myid, C->n, C->np, num_proc);
+    
     /* Do local part of multiplication. Only correct in serial. */
     ierr = MatMatMultLocal(A->n, A->data, B->data, C->data); CHKERR(ierr);
     return 0;
