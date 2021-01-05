@@ -100,24 +100,27 @@ void shuffle(double* A, double* buf_A, int buf_A_size, double* B, double* buf_B,
     /*printf("I have shuffled!\n");*/
 }
 /*计算矩阵乘法，将结果存入C中*/
-void matrix_multi(double* A, double* B, double* C, int n1, int n2, int n3, int myid) {
+void matrix_multi(double* A, double* B, double* C, int n, int myid) {
     int i = 0, j = 0, k = 0;
-    double* tmp_C = (double*)malloc(n1 * n3 * sizeof(double));
-    memset(tmp_C, 0, sizeof(double) * n1 * n3);
-    for (i = 0; i < n1; i++) {
-        for (j = 0; j < n3; j++) {
-            for (k = 0; k < n2; k++) {
-                tmp_C[i * n3 + j] += A[i * n2 + k] * B[k * n3 + j];
+    //double* tmp_C = (double*)malloc(n * n * sizeof(double));
+    //memset(tmp_C, 0, sizeof(double) * n * n);
+    double s = 0;
+    for (i = 0; i < n; i++) {
+        for (j = 0; j < n; j++) {
+            s = 0;
+            for (k = 0; k < n; k++) {
+                //tmp_C[i * n + j] += A[i * n + k] * B[k * n + j];
+                s+= A[i * n + k] * B[k * n + j]
             }
-            C[i * n3 + j] += tmp_C[i * n3 + j];
+            C[i * n + j] += s;
         }
 
     }
-    free(tmp_C);
+    //free(tmp_C);
 
 }
 void cannon(double* A, double* buf_A, int buf_A_size, double* B, double* buf_B, int buf_B_size,
-    double* C, int buf_C_size, int row_a, int col_a, int col_b, int root, int myid) {
+    double* C, int buf_C_size, int n, int root, int myid) {
     
     MPI_Status status;
     int i, j;
@@ -129,7 +132,7 @@ void cannon(double* A, double* buf_A, int buf_A_size, double* B, double* buf_B, 
     cur_col = myid - cur_row * root;
 
     for (i = 0; i < root; i++) {/*一共需要循环root次，root=sqrt(nprocs)*/
-        matrix_multi(A, B, C, row_a, col_a, col_b, myid);/*计算矩阵乘法*/
+        matrix_multi(A, B, C, n, myid);/*计算矩阵乘法*/
         /*接收来自右边(row,col+1)的数据，并将当前矩阵发送给左边(row,col-1)的进程*/
         MPI_Sendrecv(A, buf_A_size, MPI_DOUBLE, get_index(cur_row, cur_col - 1, root), 102,
             buf_A, buf_A_size, MPI_DOUBLE, get_index(cur_row, cur_col + 1, root), 102, MPI_COMM_WORLD, &status);
@@ -140,6 +143,31 @@ void cannon(double* A, double* buf_A, int buf_A_size, double* B, double* buf_B, 
         memcpy(B, buf_B, buf_B_size * sizeof(double));/*将buf_B中的数据拷贝至B中*/
         memcpy(A, buf_A, buf_A_size * sizeof(double));/*将buf_A中的数据拷贝至A中*/
 
+    }
+    if (myid == 1) {
+        printf("计算完成\n");
+        int k = 0;
+        for (i = 0; i < n; i++) {
+            for (j = 0; j < n; j++) {
+                printf("%lf\t", A[k++]);
+            }
+            printf("\n");
+        }
+        printf("B:");
+        k = 0;
+        for (i = 0; i < n; i++) {
+            for (j = 0; j < n; j++) {
+                printf("%lf\t", B[k++]);
+            }
+            printf("\n");
+        }
+        k = 0;
+        for (i = 0; i < n; i++) {
+            for (j = 0; j < n; j++) {
+                printf("%lf\t", C[k++]);
+            }
+            printf("\n");
+        }
     }
     /*将计算结果发送给数组C*/
     //MPI_Send(C, row_a * col_b, MPI_DOUBLE, 0, 104, MPI_COMM_WORLD);
@@ -175,8 +203,7 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
      /*矩阵块必须定位对齐，先做预处理*/
     MPI_Barrier(MPI_COMM_WORLD);
     if (myid == 1) {
-        printf("my id:%d\n", myid);
-        printf("A:", myid);
+        printf("A:");
         int k = 0;
         for (i = 0; i < n; i++) {
             for (j = 0; j < n; j++) {
@@ -184,7 +211,7 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
             }
             printf("\n");
         }
-        printf("B:", myid);
+        printf("B:");
         k = 0;
         for (i = 0; i < n; i++) {
             for (j = 0; j < n; j++) {
@@ -201,10 +228,10 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
         }
     }
     shuffle(A->data, buf_A, buf_A_size, B->data, buf_B, buf_B_size, root, myid);
-    //MPI_Barrier(MPI_COMM_WORLD);/*等待所有进程完成cannon算法,*/
+    MPI_Barrier(MPI_COMM_WORLD);/*等待所有进程完成cannon算法,*/
     if (myid == 1) {
         printf("交换完成:%d\n", myid);
-        printf("A:", myid);
+        printf("A:");
         int k = 0;
         for (i = 0; i < n; i++) {
             for (j = 0; j < n; j++) {
@@ -212,7 +239,7 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
             }
             printf("\n");
         }
-        printf("B:", myid);
+        printf("B:");
         k = 0;
         for (i = 0; i < n; i++) {
             for (j = 0; j < n; j++) {
@@ -228,9 +255,10 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
             printf("\n");
         }
     }
+    //经过验证上面的代码没有问题
     
     /*包含cannon全部内容*/
-    cannon(A->data, buf_A, buf_A_size, B->data, buf_B, buf_B_size, C->data, buf_C_size, A->n, A->n, B->n, root, myid);
+    cannon(A->data, buf_A, buf_A_size, B->data, buf_B, buf_B_size, C->data, buf_C_size, A->n, root, myid);
    
    
     free(buf_B);
