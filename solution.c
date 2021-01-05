@@ -63,223 +63,124 @@ void naive_multiply_add(int size, double* A, double* B, double* C)
         }
     }
 }
-void Cannon(int N,double* A, double* B, double* C) 
-{
-    // save the id of the current process and the total number of processes
-    int num_proc, my_id;
-    MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
-    MPI_Comm_rank(MPI_COMM_WORLD, &my_id);
-
-    // amount of blocks in one row / column of the matrix
-    const int grid_size = (int)sqrt(num_proc);
-    // amount of columns / rows in one matrix block (pad with zeros)
-    const int extra_space = N % grid_size ? grid_size - (N % grid_size) : 0;
-    const int block_size = (N + extra_space) / grid_size;
-    // number of elements in one matrix block
-    const int local_matrix_size = block_size * block_size;
-
-
-    // create 2D sqrt(p) x sqrt(p) grid communicator
-    const int periods[2] = { 1, 1 }; // periodic in both dimensions
-    const int dims[2] = { grid_size, grid_size }; // size of each dimension
-    MPI_Comm grid_comm;
-    MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 0, &grid_comm);
-
-    // local matrices
-    double* local_A = (double*)malloc(sizeof(double)*local_matrix_size);
-    double* local_B = (double*)malloc(sizeof(double) * local_matrix_size);
-    double* local_C = (double*)malloc(sizeof(double) * local_matrix_size);
-    // fill matrices with zeros before adding values to it
-    int i, j, k;
-    for (i = 0; i < local_matrix_size; i++) {
-        local_A[i] = 0;
-        local_B[i] = 0;
-        local_C[i] = 0;
-    }
- 
-    // get coordinates of process inside the 2D grid
-    int coords[2] = { 0, 0 };
-    MPI_Cart_coords(grid_comm, my_id, grid_size, coords);
-    // all indices smaller than this number need to send less data
-    const int adjust_indices = (grid_size - (N % grid_size)) % grid_size;
-    // datatypes and counts + displacements for send and receive
-    MPI_Datatype TMP,
-        BLOCK[num_proc], // send data from A or B to local matrix
-        LOCAL_BLOCK[num_proc], // Receive local_A or local_B from A or B
-        GATHER_LOCAL[num_proc]; // Gather local_C in C
-    int* displs =(int*)malloc(sizeof(int)*num_proc);
-    int row_offset = 0, col_offset = 0;
-    int row, col;
-    for (row = 0; row < grid_size; ++row) {
-        col_offset = 0;
-        const int off_row = (row < adjust_indices);
-        for (col = 0; col < grid_size; ++col) {
-            // ignore padding for first columns when sending the data
-            const int off_col = (col < adjust_indices);
-            const int p_id = row * grid_size + col;
-
-            // create datatype to send submatrices (BLOCK)
-            MPI_Type_vector(block_size - off_row, block_size - off_col, N, MPI_DOUBLE, &TMP);
-            MPI_Type_create_resized(TMP, 0, sizeof(double), &BLOCK[p_id]);
-            MPI_Type_commit(&BLOCK[p_id]);
-
-            // create datatype to receive submatrices (LOCAL_BLOCK)
-            MPI_Type_vector(block_size - off_row, block_size - off_col, block_size, MPI_DOUBLE, &TMP);
-            MPI_Type_create_resized(TMP, 0, sizeof(double), &LOCAL_BLOCK[p_id]);
-            MPI_Type_commit(&LOCAL_BLOCK[p_id]);
-
-            // create datatype to receive submatrices in C (GATHER_LOCAL)
-            MPI_Type_vector(block_size - off_row, block_size - off_col, N, MPI_DOUBLE, &TMP);
-            MPI_Type_create_resized(TMP, 0, sizeof(double), &GATHER_LOCAL[p_id]);
-            MPI_Type_commit(&GATHER_LOCAL[p_id]);
-
-            // displacement for send operation
-            displs[p_id] = row_offset + col_offset;
-            // increase column offset
-            col_offset += block_size - off_col;
-        }
-        // increase row offset
-        row_offset += N * (block_size - off_row);
-    }
-
-    // scatter data so that each process (i,j) has the entries for the
-    // matrix block at index (i, j)
-    MPI_Request req;
-    if (!my_id) {
-        for (i = 0; i < num_proc; ++i) {
-            MPI_Isend(A + displs[i], 1, BLOCK[i], i, 0, grid_comm, &req);
-            MPI_Isend(B + displs[i], 1, BLOCK[i], i, 1, grid_comm, &req);
-        }
-    }
-    MPI_Recv(local_A, 1, LOCAL_BLOCK[my_id], 0, 0, grid_comm, MPI_STATUS_IGNORE);
-    MPI_Recv(local_B, 1, LOCAL_BLOCK[my_id], 0, 1, grid_comm, MPI_STATUS_IGNORE);
-
-    // wait until all data is send
-    MPI_Barrier(grid_comm);
-    /*
-    After inital scatter:
-    Example blocks for matrix A or B (the numbers denote the process ids):
-    0,0  |  0, 1  |  0, 2
-    1,0  |  1, 1  |  1, 2
-    2,0  |  2, 1  |  2, 2
-    */
-
-    // ids of neighbours
-    int right = 0, left = 0, down = 0, up = 0;
-    // shift A based on the row and B based on the current column
-    MPI_Cart_shift(grid_comm, 1, coords[0], &left, &right);
-    MPI_Cart_shift(grid_comm, 0, coords[1], &up, &down);
-    MPI_Sendrecv_replace(local_A, local_matrix_size, MPI_DOUBLE, left,0, right, 0, grid_comm, MPI_STATUS_IGNORE);
-    MPI_Sendrecv_replace(local_B, local_matrix_size, MPI_DOUBLE, up,0, down, 0, grid_comm, MPI_STATUS_IGNORE);
-
-    /*
-    After inital shift:
-    Example blocks for matrix A:       Example blocks for matrix B:
-    0,0  |  0, 1  |  0, 2              0,0  |  1, 1  |  2, 2
-    1,1  |  1, 2  |  1, 0              1,0  |  2, 1  |  0, 2
-    2,2  |  2, 0  |  2, 1              2,0  |  0, 1  |  1, 2
-    */
-
-    // multiply and add values to C = C + A*B
-    naive_multiply_add(block_size, local_A, local_B, local_C);
-
-    // shift values of A/B to left/up in a loop
-    for (i = 1; i < grid_size; ++i) {
-
-        MPI_Cart_shift(grid_comm, 1, 1, &left, &right);
-        MPI_Cart_shift(grid_comm, 0, 1, &up, &down);
-        MPI_Sendrecv_replace(local_A, local_matrix_size, MPI_DOUBLE, left,0, right, 0, grid_comm, MPI_STATUS_IGNORE);
-        MPI_Sendrecv_replace(local_B, local_matrix_size, MPI_DOUBLE, up, 0, down, 0, grid_comm, MPI_STATUS_IGNORE);
-        naive_multiply_add(block_size, local_A, local_B, local_C);
-    }
-
-    // gather values in C for final result
-    MPI_Isend(local_C, 1, LOCAL_BLOCK[my_id], 0, 0, grid_comm, &req);
-    if (!my_id) {
-        for ( i = 0; i < num_proc; ++i) {
-            MPI_Recv(C + displs[i], 1, GATHER_LOCAL[i], i, 0, grid_comm,MPI_STATUS_IGNORE);
-        }
-    }
-
-    MPI_Barrier(grid_comm);
-
-    // cleanup
-    free(displs);
-    free(local_A);
-    free(local_B);
-    free(local_C);
+/*
+ *@row:矩阵所在的行
+ *@col:矩阵所在的列
+ *@sp:sp=root=sqrt(nprocs)
+ *@return 根据行列号计算进程实际编号
+*/
+int get_index(int row, int col, int sp) {
+    int tmp = ((row + sp) % sp) * sp + (col + sp) % sp;
+    return tmp;
 }
+/*用于矩阵下标定位对齐*/
+void shuffle(double* A, double* buf_A, int buf_A_size, double* B, double* buf_B, int buf_B_size, int root, int myid) {
+    int i, j;
+    MPI_Status status;
+    int cur_col = 0;
+    int cur_row = 0;
+    /*通过进程编号计算获得当前进程所在的行号和列号*/
+    cur_row = myid / root;
+    cur_col = myid - cur_row * root;
+    /*对于矩阵A，第i行的矩阵需要向左平移i次*/
+    for (i = 0; i < cur_row; i++) {
+        /*接收来自右边的数据，并将当前矩阵发送给左边的进程*/
+        MPI_Sendrecv(A, buf_A_size, MPI_DOUBLE, get_index(cur_row, cur_col - 1, root), 102,buf_A, buf_A_size, MPI_DOUBLE, get_index(cur_row, cur_col + 1, root), 102, MPI_COMM_WORLD, &status);
+        memcpy(A, buf_A, buf_A_size * sizeof(double));/*buf_A用于通信时缓存矩阵*/
+        memset(buf_A, 0, buf_A_size * sizeof(double));
+    }
+    /*对于矩阵B，第j列的矩阵需要向上平移j次*/
+    for (j = 0; j < cur_col; j++) {
+        /*接收来自下边的数据，并将当前矩阵发送给上边的进程*/
+        MPI_Sendrecv(B, buf_B_size, MPI_DOUBLE, get_index(cur_row - 1, cur_col, root), 103,buf_B, buf_B_size, MPI_DOUBLE, get_index(cur_row + 1, cur_col, root), 103, MPI_COMM_WORLD, &status);
+        memcpy(B, buf_B, buf_B_size * sizeof(double));/*buf_B用于通信时缓存矩阵*/
+        memset(buf_B, 0, buf_B_size * sizeof(double));
+    }
+    /*printf("I have shuffled!\n");*/
+}
+/*计算矩阵乘法，将结果存入C中*/
+void matrix_multi(double* A, double* B, double* C, int n1, int n2, int n3, int myid) {
+    int i = 0, j = 0, k = 0;
+    double* tmp_C = (double*)malloc(n1 * n3 * sizeof(double));
+    memset(tmp_C, 0, sizeof(double) * n1 * n3);
 
+    for (i = 0; i < n1; i++) {
+        for (j = 0; j < n3; j++) {
+            for (k = 0; k < n2; k++) {
+                tmp_C[i * n3 + j] += A[i * n2 + k] * B[k * n3 + j];
+            }
+            C[i * n3 + j] += tmp_C[i * n3 + j];
+        }
+
+    }
+
+}
+void cannon(double* A, double* buf_A, int buf_A_size, double* B, double* buf_B, int buf_B_size,
+    double* C, int buf_C_size, int row_a, int col_a, int col_b, int root, int myid) {
+    MPI_Status status;
+    double elapsed_time, multiply_time = 0, passdata_time = 0;
+    int i, j;
+    memset(C, 0, sizeof(double) * buf_C_size);
+    int cur_col = 0;
+    int cur_row = 0;
+    /*通过进程编号计算获得当前进程所在的行号和列号*/
+    cur_row = myid / root;
+    cur_col = myid - cur_row * root;
+
+    for (i = 0; i < root; i++) {/*一共需要循环root次，root=sqrt(nprocs)*/
+        matrix_multi(A, B, C, row_a, col_a, col_b, myid);/*计算矩阵乘法*/
+ 
+        /*接收来自右边(row,col+1)的数据，并将当前矩阵发送给左边(row,col-1)的进程*/
+        MPI_Sendrecv(A, buf_A_size, MPI_DOUBLE, get_index(cur_row, cur_col - 1, root), 102,
+            buf_A, buf_A_size, MPI_DOUBLE, get_index(cur_row, cur_col + 1, root), 102, MPI_COMM_WORLD, &status);
+        /*接收来自下边(row+1,col)的数据，并将当前矩阵发送给上边(row-1,col)的进程*/
+        MPI_Sendrecv(B, buf_B_size, MPI_DOUBLE, get_index(cur_row - 1, cur_col, root), 103,
+            buf_B, buf_B_size, MPI_DOUBLE, get_index(cur_row + 1, cur_col, root), 103, MPI_COMM_WORLD, &status);
+       
+        memcpy(B, buf_B, buf_B_size * sizeof(double));/*将buf_B中的数据拷贝至B中*/
+        memcpy(A, buf_A, buf_A_size * sizeof(double));/*将buf_A中的数据拷贝至A中*/
+
+    }
+    /*将计算结果发送给数组C*/
+    MPI_Send(C, row_a * col_b, MPI_DOUBLE, 0, 104, MPI_COMM_WORLD);
+}
 int MatMatMultCannon(Mat A, Mat B, Mat C)
 {
     int ierr;
     fprintf(stderr, "[MatMatMultCannon]: TODO, please implement me.\n");
-
-    // save the id of the current process and the total number of processes
-    int num_proc, my_id;
+    
+    int num_proc, myid;
     MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_id);
-  
-    int i,j,k;
-    // create 2D sqrt(p) x sqrt(p) grid communicator
- 
-    int N = A->n;
-    double* global_A=(double*)malloc(sizeof(double) * N*N);
-    double* global_B = (double*)malloc(sizeof(double) * N*N);
-    double* global_C = (double*)malloc(sizeof(double) * N*N);
-    if (my_id == 0) {
-        for (i = 0; i < N * N; i++) {
-            global_A[i] = A->data[i];
-            global_B[i] = B->data[i];
-            global_C[i] = C->data[i];
-        }
-
+    int n = A->n;
+    int root = sqrt(num_proc);
+    if (root * root != num_proc) {
+        printf("process number must be a squre!\n");
+        return 0;
     }
-    k = 0;
-    if (my_id == 0) {
-        /*printf("A matrix\n");
-        for (i = 0; i < N; i++) {
-            for (j = 0; j < N; j++) {
-                printf("%lf\t",A->data[k++]);
-            }
-            printf("\n");
-        }
-        printf("B matrix\n");
-        k = 0;
-        for (i = 0; i < N; i++) {
-            for (j = 0; j < N; j++) {
-                printf("%lf\t", B->data[k++]);
-            }
-            printf("\n");
-        }
-        printf("C matrix\n");
-        k = 0;
-        for (i = 0; i < N; i++) {
-            for (j = 0; j < N; j++) {
-                printf("%lf\t", C->data[k++]);
-            }
-            printf("\n");
-        }*/
+    
+    double * buf_A, * buf_B;
+    buf_A = (double*)malloc(sizeof(double) * A->n*A->n);
+    buf_B = (double*)malloc(sizeof(double) * B->n * B->n);
+    if (buf_A == NULL || buf_B == NULL) {
+        printf("Memory allocation failed!\n");
+        return 0;
     }
+    int buf_A_size = A->n * A->n;
+    int buf_B_size = B->n * B->n;
+    int buf_B_size = C->n * C->n;
+    /*compute C=A*B by Cannon algorithm*/
+     /*矩阵块必须定位对齐，先做预处理*/
+    shuffle(A->data, buf_A, buf_A_size, B->data, buf_B, buf_B_size, root, myid);
+    
+    /*包含cannon全部内容*/
+    cannon(A->data, buf_A, buf_A_size, B->data, buf_B, buf_B_size, C->data, buf_C_size, A->n, A->n, B->n, root, myid);
     MPI_Barrier(MPI_COMM_WORLD);
-    Cannon(N,global_A, global_B, global_C);
-    
-    if (my_id == 0) {
-      
-        for (i = 0; i < N * N; i++) {
-            C->data[i] += global_C[i];
-        }
-        k = 0;
-      /*  printf("C2 matix:\n");
-        for (i = 0; i < N; i++) {
-            for (j = 0; j < N; j++) {
-                printf("%lf\t", C->data[k++]);
-            }
-            printf("\n");
-        }*/
-    }
-    
-    MPI_Barrier(grid_comm);
+
+
+    MPI_Barrier(MPI_COMM_WORLD);/*等待所有进程完成cannon算法，将结果发送给进程0*/
+    free(buf_B);
+    free(buf_A);
     /* Do local part of multiplication. Only correct in serial. */
     ierr = MatMatMultLocal(A->n, A->data, B->data, C->data); CHKERR(ierr);
     return 0;
