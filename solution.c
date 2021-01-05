@@ -220,10 +220,10 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
     MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_id);
   
-
+    int i,j,k;
     // create 2D sqrt(p) x sqrt(p) grid communicator
-    int i;
-    int N = A->N;
+ 
+    int N = A->n;
     double* global_A=(double*)malloc(sizeof(double) * N*N);
     double* global_B = (double*)malloc(sizeof(double) * N*N);
     double* global_C = (double*)malloc(sizeof(double) * N*N);
@@ -235,14 +235,50 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
         }
 
     }
+    k = 0;
+    if (my_id == 0) {
+        printf("A matrix\n");
+        for (i = 0; i < N; i++) {
+            for (j = 0; j < N; j++) {
+                printf("%lf\t",A->data[k++]);
+            }
+            printf("\n");
+        }
+        printf("B matrix\n");
+        k = 0;
+        for (i = 0; i < N; i++) {
+            for (j = 0; j < N; j++) {
+                printf("%lf\t", B->data[k++]);
+            }
+            printf("\n");
+        }
+        printf("C matrix\n");
+        k = 0;
+        for (i = 0; i < N; i++) {
+            for (j = 0; j < N; j++) {
+                printf("%lf\t", C->data[k++]);
+            }
+            printf("\n");
+        }
+    }
     MPI_Barrier(MPI_COMM_WORLD);
     Cannon(N,global_A, global_B, global_C);
     
     if (my_id == 0) {
+      
         for (i = 0; i < N * N; i++) {
             C->data[i] += global_C[i];
         }
+        k = 0;
+        printf("C2 matix:\n");
+        for (i = 0; i < N; i++) {
+            for (j = 0; j < N; j++) {
+                printf("%lf\t", C->data[k++]);
+            }
+            printf("\n");
+        }
     }
+    
  
     /* Do local part of multiplication. Only correct in serial. */
     ierr = MatMatMultLocal(A->n, A->data, B->data, C->data); CHKERR(ierr);
