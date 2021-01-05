@@ -97,27 +97,22 @@ void shuffle(double* A, double* buf_A, int buf_A_size, double* B, double* buf_B,
         memcpy(B, buf_B, buf_B_size * sizeof(double));/*buf_B用于通信时缓存矩阵*/
         memset(buf_B, 0, buf_B_size * sizeof(double));
     } 
-    /*printf("I have shuffled!\n");*/
 }
 /*计算矩阵乘法，将结果存入C中*/
 void matrix_multi(double* A, double* B, double* C, int n, int myid) {
     int i = 0, j = 0, k = 0;
-    //double* tmp_C = (double*)malloc(n * n * sizeof(double));
-    //memset(tmp_C, 0, sizeof(double) * n * n);
     double s = 0;
     for (i = 0; i < n; i++) {
         for (j = 0; j < n; j++) {
             s = 0;
             for (k = 0; k < n; k++) {
                 //tmp_C[i * n + j] += A[i * n + k] * B[k * n + j];
-                s+= A[i * n + k] * B[k * n + j]
+                s += A[i * n + k] * B[k * n + j];
             }
             C[i * n + j] += s;
         }
 
     }
-    //free(tmp_C);
-
 }
 void cannon(double* A, double* buf_A, int buf_A_size, double* B, double* buf_B, int buf_B_size,
     double* C, int buf_C_size, int n, int root, int myid) {
@@ -144,40 +139,11 @@ void cannon(double* A, double* buf_A, int buf_A_size, double* B, double* buf_B, 
         memcpy(A, buf_A, buf_A_size * sizeof(double));/*将buf_A中的数据拷贝至A中*/
 
     }
-    if (myid == 1) {
-        printf("计算完成\n");
-        int k = 0;
-        for (i = 0; i < n; i++) {
-            for (j = 0; j < n; j++) {
-                printf("%lf\t", A[k++]);
-            }
-            printf("\n");
-        }
-        printf("B:");
-        k = 0;
-        for (i = 0; i < n; i++) {
-            for (j = 0; j < n; j++) {
-                printf("%lf\t", B[k++]);
-            }
-            printf("\n");
-        }
-        k = 0;
-        for (i = 0; i < n; i++) {
-            for (j = 0; j < n; j++) {
-                printf("%lf\t", C[k++]);
-            }
-            printf("\n");
-        }
-    }
-    /*将计算结果发送给数组C*/
-    //MPI_Send(C, row_a * col_b, MPI_DOUBLE, 0, 104, MPI_COMM_WORLD);
 }
 
 int MatMatMultCannon(Mat A, Mat B, Mat C)
 {
     int ierr,i,j;
-    fprintf(stderr, "[MatMatMultCannon]: TODO, please implement me.\n");
-    
     int num_proc, myid;
     MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
@@ -202,71 +168,16 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
     /*compute C=C+A*B by Cannon algorithm*/
      /*矩阵块必须定位对齐，先做预处理*/
     MPI_Barrier(MPI_COMM_WORLD);
-    if (myid == 1) {
-        printf("A:");
-        int k = 0;
-        for (i = 0; i < n; i++) {
-            for (j = 0; j < n; j++) {
-                printf("%lf\t", A->data[k++]);
-            }
-            printf("\n");
-        }
-        printf("B:");
-        k = 0;
-        for (i = 0; i < n; i++) {
-            for (j = 0; j < n; j++) {
-                printf("%lf\t", B->data[k++]);
-            }
-            printf("\n");
-        }
-        k = 0;
-        for (i = 0; i < n; i++) {
-            for (j = 0; j < n; j++) {
-                printf("%lf\t", C->data[k++]);
-            }
-            printf("\n");
-        }
-    }
+   
     shuffle(A->data, buf_A, buf_A_size, B->data, buf_B, buf_B_size, root, myid);
     MPI_Barrier(MPI_COMM_WORLD);/*等待所有进程完成cannon算法,*/
-    if (myid == 1) {
-        printf("交换完成:%d\n", myid);
-        printf("A:");
-        int k = 0;
-        for (i = 0; i < n; i++) {
-            for (j = 0; j < n; j++) {
-                printf("%lf\t", A->data[k++]);
-            }
-            printf("\n");
-        }
-        printf("B:");
-        k = 0;
-        for (i = 0; i < n; i++) {
-            for (j = 0; j < n; j++) {
-                printf("%lf\t", B->data[k++]);
-            }
-            printf("\n");
-        }
-        k = 0;
-        for (i = 0; i < n; i++) {
-            for (j = 0; j < n; j++) {
-                printf("%lf\t", C->data[k++]);
-            }
-            printf("\n");
-        }
-    }
-    //经过验证上面的代码没有问题
-    
-    /*包含cannon全部内容*/
+   
     cannon(A->data, buf_A, buf_A_size, B->data, buf_B, buf_B_size, C->data, buf_C_size, A->n, root, myid);
    
    
     free(buf_B);
     free(buf_A);
     MPI_Barrier(MPI_COMM_WORLD);/*等待所有进程完成cannon算法,*/
-    
-    
-    /* Do local part of multiplication. Only correct in serial. */
-    ierr = MatMatMultLocal(A->n, A->data, B->data, C->data); CHKERR(ierr);
+
     return 0;
 }
