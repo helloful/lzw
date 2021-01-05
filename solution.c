@@ -42,7 +42,6 @@ void naive_multiply_add(int size, double* A, double* B, double* C)
         }
     }
 }
-void MatrixMultiply()
 /* C <- AB + C using the SUMMA algorithm.
  *
  * - A: input matrix
@@ -52,6 +51,7 @@ void MatrixMultiply()
 int MatMatMultSumma(Mat A, Mat B, Mat C)
 {
   int num_proc, myid;
+  MPI_Status status;
   MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
   MPI_Comm_rank(MPI_COMM_WORLD, &myid);
   int i, j, k;
@@ -75,8 +75,8 @@ int MatMatMultSumma(Mat A, Mat B, Mat C)
   }
   //计算矩阵的值
   for (i = 0; i < p; i++) {
-      MPI_Recv(recvA, A->n * A->n, MPI_DOUBLE, myRow * *p + i, 1, MPI_COMM_WORLD);
-      MPI_Recv(recvB, B->n * B->n, MPI_Sendrecv, i * p + myCol, 2, MPI_COMM_WORLD);
+      MPI_Recv(recvA, A->n * A->n, MPI_DOUBLE, myRow *p + i, 1, MPI_COMM_WORLD,&status);
+      MPI_Recv(recvB, B->n * B->n, MPI_DOUBLE, i * p + myCol, 2, MPI_COMM_WORLD,&status);
 
       naive_multiply_add(A->n, recvA, recvB, C->data);
 
