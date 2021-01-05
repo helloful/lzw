@@ -57,7 +57,7 @@ int MatMult(Mat A, Vec x, Vec y)
     }
     double* recvA = (double*)malloc(sizeof(double) * A->n * A->n);
     double* recvx = (double*)malloc(sizeof(double) * x->n);
-    double* resulty = (double*)malloc(sizeof(double) * y->n);
+    double* resultC = (double*)malloc(sizeof(double) * y->n);
 
     for (i = 0; i < A->n ; i++) {
         resultC[i] = 0;
@@ -65,7 +65,7 @@ int MatMult(Mat A, Vec x, Vec y)
     //计算矩阵的值
     for (i = 0; i < p; i++) {
         MPI_Recv(recvA, A->n * A->n, MPI_DOUBLE, myRow * p + i, 1, MPI_COMM_WORLD, &status);
-        MPI_Recv(recvB, B->n, MPI_DOUBLE, i * p + myCol, 2, MPI_COMM_WORLD, &status);
+        MPI_Recv(recvx, x->n, MPI_DOUBLE, i * p + myCol, 2, MPI_COMM_WORLD, &status);
         MatrixMultiply(recvA, recvB, resulty, A->n, A->n, 1);
         MatrixAdd(y->data, resultC, A->n, 1);
     }
