@@ -107,7 +107,7 @@ void Cannon(int N,double* A, double* B, double* C)
         BLOCK[num_proc], // send data from A or B to local matrix
         LOCAL_BLOCK[num_proc], // Receive local_A or local_B from A or B
         GATHER_LOCAL[num_proc]; // Gather local_C in C
-    int* displs = (int*)malloc(sizeof(int)*num_proc);
+    int* displs =(int*)malloc(sizeof(int)*num_proc);
     int row_offset = 0, col_offset = 0;
     int row, col;
     for (row = 0; row < grid_size; ++row) {
@@ -119,17 +119,17 @@ void Cannon(int N,double* A, double* B, double* C)
             const int p_id = row * grid_size + col;
 
             // create datatype to send submatrices (BLOCK)
-            MPI_Type_vector(block_size - off_row, block_size - off_col, N, MPI_VALUE_TYPE, &TMP);
+            MPI_Type_vector(block_size - off_row, block_size - off_col, N, MPI_DOUBLE, &TMP);
             MPI_Type_create_resized(TMP, 0, sizeof(double), &BLOCK[p_id]);
             MPI_Type_commit(&BLOCK[p_id]);
 
             // create datatype to receive submatrices (LOCAL_BLOCK)
-            MPI_Type_vector(block_size - off_row, block_size - off_col, block_size, MPI_VALUE_TYPE, &TMP);
+            MPI_Type_vector(block_size - off_row, block_size - off_col, block_size, MPI_DOUBLE, &TMP);
             MPI_Type_create_resized(TMP, 0, sizeof(double), &LOCAL_BLOCK[p_id]);
             MPI_Type_commit(&LOCAL_BLOCK[p_id]);
 
             // create datatype to receive submatrices in C (GATHER_LOCAL)
-            MPI_Type_vector(block_size - off_row, block_size - off_col, N, MPI_VALUE_TYPE, &TMP);
+            MPI_Type_vector(block_size - off_row, block_size - off_col, N, MPI_DOUBLE, &TMP);
             MPI_Type_create_resized(TMP, 0, sizeof(double), &GATHER_LOCAL[p_id]);
             MPI_Type_commit(&GATHER_LOCAL[p_id]);
 
@@ -169,8 +169,8 @@ void Cannon(int N,double* A, double* B, double* C)
     // shift A based on the row and B based on the current column
     MPI_Cart_shift(grid_comm, 1, coords[0], &left, &right);
     MPI_Cart_shift(grid_comm, 0, coords[1], &up, &down);
-    MPI_Sendrecv_replace(local_A, local_matrix_size, MPI_VALUE_TYPE, left,0, right, 0, grid_comm, MPI_STATUS_IGNORE);
-    MPI_Sendrecv_replace(local_B, local_matrix_size, MPI_VALUE_TYPE, up,0, down, 0, grid_comm, MPI_STATUS_IGNORE);
+    MPI_Sendrecv_replace(local_A, local_matrix_size, MPI_DOUBLE, left,0, right, 0, grid_comm, MPI_STATUS_IGNORE);
+    MPI_Sendrecv_replace(local_B, local_matrix_size, MPI_DOUBLE, up,0, down, 0, grid_comm, MPI_STATUS_IGNORE);
 
     /*
     After inital shift:
@@ -188,8 +188,8 @@ void Cannon(int N,double* A, double* B, double* C)
 
         MPI_Cart_shift(grid_comm, 1, 1, &left, &right);
         MPI_Cart_shift(grid_comm, 0, 1, &up, &down);
-        MPI_Sendrecv_replace(local_A, local_matrix_size, MPI_VALUE_TYPE, left,0, right, 0, grid_comm, MPI_STATUS_IGNORE);
-        MPI_Sendrecv_replace(local_B, local_matrix_size, MPI_VALUE_TYPE, up, 0, down, 0, grid_comm, MPI_STATUS_IGNORE);
+        MPI_Sendrecv_replace(local_A, local_matrix_size, MPI_DOUBLE, left,0, right, 0, grid_comm, MPI_STATUS_IGNORE);
+        MPI_Sendrecv_replace(local_B, local_matrix_size, MPI_DOUBLE, up, 0, down, 0, grid_comm, MPI_STATUS_IGNORE);
         naive_multiply_add(block_size, local_A, local_B, local_C);
     }
 
@@ -237,7 +237,7 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
     }
     MPI_Barrier(MPI_COMM_WORLD);
     Cannon(N,global_A, global_B, global_C);
-    
+    int i;
     if (my_id == 0) {
         for (i = 0; i < N * N; i++) {
             C->data[i] += global_C[i];
