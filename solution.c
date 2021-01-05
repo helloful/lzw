@@ -107,7 +107,7 @@ void Cannon(int N,double* A, double* B, double* C)
         BLOCK[num_proc], // send data from A or B to local matrix
         LOCAL_BLOCK[num_proc], // Receive local_A or local_B from A or B
         GATHER_LOCAL[num_proc]; // Gather local_C in C
-    int* displs = new int[num_proc];
+    int* displs = (int*)malloc(sizeof(int)*num_proc);
     int row_offset = 0, col_offset = 0;
     int row, col;
     for (row = 0; row < grid_size; ++row) {
