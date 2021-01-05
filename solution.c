@@ -7,6 +7,30 @@
 #include "vec.h"
 #include "utils.h"
 
+void MatrixMultiply(double* A, double* B, double* C, int m, int n, int p)
+{
+    int i, j, k;
+    for (i = 0; i < m; i++) {
+        for (j = 0; j < p; j++) {
+            double result = 0;
+            for (k = 0; k < n; k++) {
+                result = A[i * n + k] * B[k * p + j] + result;
+
+            }
+            C[i * p + j] = result;
+        }
+    }
+}
+void MatrixAdd(double* A, double* B, int m, int n) //the result remain in A
+{
+    int i, j;
+    for (i = 0; i < m; i++) {
+        for (j = 0; j < n; j++) {
+            A[i * n + j] = A[i * n + j] + B[i * n + j];
+        }
+    }
+}
+
 /* y <- Ax
  * - A: matrix
  * - x: input vector
@@ -14,18 +38,38 @@
  */
 int MatMult(Mat A, Vec x, Vec y)
 {
-  int ierr;
+   // n*n×n*1=n*1
+    int num_proc, myid;
+    MPI_Status status;
+    MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
+    MPI_Comm_rank(MPI_COMM_WORLD, &myid);
+    int i, j, k;
+    int p = A->np;
+    int myRow = myid / p;
+    int myCol = myid % p;
+    for (i = 0; i < p; i++) {
+        MPI_Send(A->data, A->n * A->n, MPI_DOUBLE, myRow * p + i, 1, MPI_COMM_WORLD);
+        MPI_Send(x->data, x->n , MPI_DOUBLE, myRow * p + 1, 2, MPI_COMM_WORLD);
+
+        MPI_Send(A->data, A->n * A->n, MPI_DOUBLE, i * p + myCol, 1, MPI_COMM_WORLD);
+        MPI_Send(x->data, x->n, MPI_DOUBLE, i * p + myCol, 2, MPI_COMM_WORLD);
+
+    }
+    double* recvA = (double*)malloc(sizeof(double) * A->n * A->n);
+    double* recvx = (double*)malloc(sizeof(double) * x->n);
+    double* resulty = (double*)malloc(sizeof(double) * y->n);
+
+    for (i = 0; i < A->n ; i++) {
+        resultC[i] = 0;
+    }
+    //计算矩阵的值
+    for (i = 0; i < p; i++) {
+        MPI_Recv(recvA, A->n * A->n, MPI_DOUBLE, myRow * p + i, 1, MPI_COMM_WORLD, &status);
+        MPI_Recv(recvB, B->n, MPI_DOUBLE, i * p + myCol, 2, MPI_COMM_WORLD, &status);
+        MatrixMultiply(recvA, recvB, resulty, A->n, A->n, 1);
+        MatrixAdd(y->data, resultC, A->n, 1);
+    }
   
-  if (A->N != x->N || A->N != y->N || x->n != A->n/A->np || x->n != y->n) {
-    fprintf(stderr, "Mismatching sizes in MatMult %d %d %d\n", A->N, x->N, y->N);
-    return MPI_Abort(A->comm, MPI_ERR_ARG);
-  }
-  fprintf(stderr, "[MatMult]: TODO, please implement me.\n");
-  /* Do local part of multiplication. This is only correct in serial.
-   * This code is included to show you how to call MatMultLocal,
-   * you'll need to change the arguments in parallel.
-   */
-  ierr = MatMultLocal(x->n, A->data, x->data, y->data);CHKERR(ierr);
   return 0;
 }
 
@@ -77,9 +121,7 @@ int MatMatMultSumma(Mat A, Mat B, Mat C)
   for (i = 0; i < p; i++) {
       MPI_Recv(recvA, A->n * A->n, MPI_DOUBLE, myRow *p + i, 1, MPI_COMM_WORLD,&status);
       MPI_Recv(recvB, B->n * B->n, MPI_DOUBLE, i * p + myCol, 2, MPI_COMM_WORLD,&status);
-
       naive_multiply_add(A->n, recvA, recvB, C->data);
-
   }
   return 0;
 }
