@@ -88,7 +88,7 @@ int MatMult(Mat A, Vec x, Vec y)
             }
         }
     }
-   /* if (myid == 1) {
+    if (myid == 1) {
         printf("MYID==1\n");
         printf("A\n");
         for (i = 0; i < A->n; i++) {
@@ -101,7 +101,7 @@ int MatMult(Mat A, Vec x, Vec y)
         for (i = 0; i < k; i++) {
             printf("%lf\t",B[i]);
         }
-    }*/
+    }
     //收集对齐以后，使用SUMMA算法
     for (i = 0; i < p; i++) {
         MPI_Send(A->data, A->n * A->n, MPI_DOUBLE, myRow * p + i, 1, MPI_COMM_WORLD);
@@ -124,7 +124,7 @@ int MatMult(Mat A, Vec x, Vec y)
     for (i = 0; i < p; i++) {
         MPI_Recv(recvA, A->n * A->n, MPI_DOUBLE, myRow * p + i, 1, MPI_COMM_WORLD, &status);
         MPI_Recv(recvB, A->n, MPI_DOUBLE, i * p + myCol, 2, MPI_COMM_WORLD, &status);
-        MatrixMultiply(recvA, recvB, resultC, A->n, A->n, 1);
+        MatrixMultiply(recvA, recvB, C, A->n, A->n, 1);
         //MatrixAdd(C, resultC, A->n, 1);
     }
     if (myid == 0) {
@@ -133,6 +133,9 @@ int MatMult(Mat A, Vec x, Vec y)
             printf("%lf\t",C[i]);
         }
         printf("\n");
+    }
+    for (i = 0; i < y->n; i++) {
+        y->data[i] = C[i];
     }
   return 0;
 }
