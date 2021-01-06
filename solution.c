@@ -7,6 +7,35 @@
 #include "vec.h"
 #include "utils.h"
 
+void MatrixMultiply(int* A, int* B, int* C, unsigned m, unsigned n, unsigned p)
+{
+    int i, j, k;
+    for (i = 0; i < m; i++)
+    {
+        for (j = 0; j < p; j++)
+        {
+            int result = 0;
+            for (k = 0; k < n; k++)
+            {
+                result = A[i * n + k] * B[k * p + j] + result;
+
+            }
+            C[i * p + j] = result;
+        }
+    }
+}
+
+
+void MatrixAdd(int* A, int* B, int m, int n) //the result remain in A
+{
+    int i, j;
+    for (i = 0; i < m; i++) {
+        for (j = 0; j < n; j++)
+        {
+            A[i * n + j] = A[i * n + j] + B[i * n + j];
+        }
+    }
+}
 
 /* y <- Ax
  * - A: matrix
@@ -52,14 +81,39 @@ int MatMult(Mat A, Vec x, Vec y)
             }
         }
     }
+    //收集对齐以后，使用SUMMA算法
+    for (i = 0; i < p; i++) {
+        MPI_Send(A->data, A->n * A->n, MPI_DOUBLE, myRow * p + i, 1, MPI_COMM_WORLD);
+        MPI_Send(B, A->n, MPI_DOUBLE, myRow * p + i, 2, MPI_COMM_WORLD);
+
+        MPI_Send(A->data, A->n * A->n, MPI_DOUBLE, i * p + myCol, 1, MPI_COMM_WORLD);
+        MPI_Send(B, A->n, MPI_DOUBLE, i * p + myCol, 2, MPI_COMM_WORLD);
+
+    }
+    double* recvA = (double*)malloc(sizeof(double) * A->n * A->n);
+    double* recvB = (double*)malloc(sizeof(double) * A->n);
+    double* resultC = (double*)malloc(sizeof(double) * A->n);
+    double* C = (double*)malloc(sizeof(double) * A->n);
+
+    for (i = 0; i < A->n ; i++) {
+        resultC[i] = 0;
+    }
+    for (i = 0; i < A->n; i++) C[i] = 0;
+    //计算矩阵的值
+    for (i = 0; i < p; i++) {
+        MPI_Recv(recvA, A->n * A->n, MPI_DOUBLE, myRow * p + i, 1, MPI_COMM_WORLD, &status);
+        MPI_Recv(recvB, A->n, MPI_DOUBLE, i * p + myCol, 2, MPI_COMM_WORLD, &status);
+        MatrixMultiply(recvA, recvB, resultC, A->n, A->n, 1);
+        MatrixAdd(C, resultC, A->n, 1);
+    }
     if (myid == 0) {
-        printf("I'm processor 0:\n");
-        for (i = 0; i < k; i++) {
-            printf("%lf\t",B[i]);
+        printf("I'm 0 processor\n");
+        for (i = 0; i < A->n; i++) {
+            printf("%lf\t",C[i]);
         }
         printf("\n");
     }
-       
+    
 
   return 0;
 }
@@ -242,4 +296,3 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
 
     return 0;
 }
-//大修改，希望可以保存
