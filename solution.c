@@ -37,6 +37,7 @@ void MatrixAdd(double* A, double* B, int m, int n) //the result remain in A
     }
 }
 
+
 /* y <- Ax
  * - A: matrix
  * - x: input vector
@@ -48,6 +49,7 @@ int MatMult(Mat A, Vec x, Vec y)
     //ps:A->n not equal x->n
     int num_proc, myid;
     MPI_Status status;
+    MPI_Comm comm;
     MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
     int p = sqrt(num_proc);
@@ -56,6 +58,8 @@ int MatMult(Mat A, Vec x, Vec y)
         return 0;
     }
     double* B = (double*)malloc(sizeof(double) * A->n);
+    double* C = (double*)malloc(sizeof(double) * A->n);
+    double* recvC = (double*)malloc(sizeof(double) * A->n);
     double* tmp = (double*)malloc(sizeof(double) * x->n);
     int myRow = myid / p;
     int myCol = myid % p;
@@ -88,55 +92,46 @@ int MatMult(Mat A, Vec x, Vec y)
             }
         }
     }
-    if (myid == 1) {
-        printf("MYID==1\n");
-        printf("A\n");
-        for (i = 0; i < A->n; i++) {
-            for (j = 0; j < A->n; j++) {
-                printf("%lf\t",A->data[i*A->n+j]);
-            }
-            printf("\n");
-        }
-        printf("\nB\n");
-        for (i = 0; i < k; i++) {
-            printf("%lf\t",B[i]);
-        }
-    }
-    //收集对齐以后，使用SUMMA算法
-    for (i = 0; i < p; i++) {
-        MPI_Send(A->data, A->n * A->n, MPI_DOUBLE, myRow * p + i, 1, MPI_COMM_WORLD);
-        MPI_Send(B, A->n, MPI_DOUBLE, myRow * p + i, 2, MPI_COMM_WORLD);
+  
 
-        MPI_Send(A->data, A->n * A->n, MPI_DOUBLE, i * p + myCol, 1, MPI_COMM_WORLD);
-        MPI_Send(B, A->n, MPI_DOUBLE, i * p + myCol, 2, MPI_COMM_WORLD);
-
-    }
-    double* recvA = (double*)malloc(sizeof(double) * A->n * A->n);
-    double* recvB = (double*)malloc(sizeof(double) * A->n);
-    double* resultC = (double*)malloc(sizeof(double) * A->n);
-    double* C = (double*)malloc(sizeof(double) * A->n);
-
-    for (i = 0; i < A->n ; i++) {
-        resultC[i] = 0;
+    //收集好以后，计算每一块的局部和
+    for (i = 0; i < A->n; i++) {
         C[i] = 0;
     }
-    //计算矩阵的值
+    MatrixMultiply(A->data, B, C, A->n, A->n, 1);
+    //计算好每一块以后，应该进行局部移动，在同一行之间进行数据传递
+    double* ans = (double*)malloc(sizeof(double) * A->n);
+    for (i = 0; i < A->n; i++) ans[i] = 0;
     for (i = 0; i < p; i++) {
-        MPI_Recv(recvA, A->n * A->n, MPI_DOUBLE, myRow * p + i, 1, MPI_COMM_WORLD, &status);
-        MPI_Recv(recvB, A->n, MPI_DOUBLE, i * p + myCol, 2, MPI_COMM_WORLD, &status);
-        MatrixMultiply(recvA, recvB, C, A->n, A->n, 1);
-        //MatrixAdd(C, resultC, A->n, 1);
+        //只要行号相同则在同一行之间进行发送
+        int sendId = myRow * p + i;
+        if (myid != sendId) {
+            MPI_Send(C, A->n, MPI_DOUBLE, sendId, 1, MPI_COMM_WORLD);
+        }
+    }
+    for (i = 0; i < p; i++) {
+        //接收同一行的数据
+        int recvId = myRow * p + i;
+        if (recvId != myid) {
+            MPI_Recv(recvC, A->n, MPI_DOUBLE, recvId, 1, MPI_COMM_WORLD, &status);
+            for (j = 0; j <A->n; j++) {
+                ans[j] += recvC[j];
+            }
+           
+        }
+        else {
+            for (j = 0; j < p; j++) {
+                ans[j] += C[j];
+            }
+        }
     }
     if (myid == 0) {
-        printf("I'm 0 processor\n");
-        for (i = 0; i < A->n; i++) {
-            printf("%lf\t",C[i]);
+        printf("ID=0:\n");
+        for (int i = 0; i < A->n; i++) {
+            printf("%lf\t",ans[i]);
         }
-        printf("\n");
     }
-    for (i = 0; i < y->n; i++) {
-        y->data[i] = C[i];
-    }
+    
   return 0;
 }
 
