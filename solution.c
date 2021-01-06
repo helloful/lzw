@@ -20,7 +20,7 @@ void MatrixMultiply(double* A, double* B, double* C, int m, int n, int p)
                 result = A[i * n + k] * B[k * p + j] + result;
 
             }
-            C[i * p + j] = result;
+            C[i * p + j] += result;
         }
     }
 }
@@ -79,7 +79,7 @@ int MatMult(Mat A, Vec x, Vec y)
             MPI_Recv(tmp, x->n, MPI_DOUBLE, recvId, 1, MPI_COMM_WORLD, &status);
             for (j = 0; j < x->n; j++) {
                 B[k++] = tmp[j];
-                tmp[i] = 0;
+                tmp[j] = 0;
             }
         }
         else {
@@ -88,12 +88,20 @@ int MatMult(Mat A, Vec x, Vec y)
             }
         }
     }
-    if (myid == 1) {
+   /* if (myid == 1) {
         printf("MYID==1\n");
+        printf("A\n");
+        for (i = 0; i < A->n; i++) {
+            for (j = 0; j < A->n; j++) {
+                printf("%lf\t",A->data[i*A->n+j]);
+            }
+            printf("\n");
+        }
+        printf("\nB\n");
         for (i = 0; i < k; i++) {
             printf("%lf\t",B[i]);
         }
-    }
+    }*/
     //收集对齐以后，使用SUMMA算法
     for (i = 0; i < p; i++) {
         MPI_Send(A->data, A->n * A->n, MPI_DOUBLE, myRow * p + i, 1, MPI_COMM_WORLD);
@@ -110,14 +118,14 @@ int MatMult(Mat A, Vec x, Vec y)
 
     for (i = 0; i < A->n ; i++) {
         resultC[i] = 0;
+        C[i] = 0;
     }
-    for (i = 0; i < A->n; i++) C[i] = 0;
     //计算矩阵的值
     for (i = 0; i < p; i++) {
         MPI_Recv(recvA, A->n * A->n, MPI_DOUBLE, myRow * p + i, 1, MPI_COMM_WORLD, &status);
         MPI_Recv(recvB, A->n, MPI_DOUBLE, i * p + myCol, 2, MPI_COMM_WORLD, &status);
         MatrixMultiply(recvA, recvB, resultC, A->n, A->n, 1);
-        MatrixAdd(C, resultC, A->n, 1);
+        //MatrixAdd(C, resultC, A->n, 1);
     }
     if (myid == 0) {
         printf("I'm 0 processor\n");
