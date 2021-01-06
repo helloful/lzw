@@ -128,6 +128,11 @@ int MatMult(Mat A, Vec x, Vec y)
     for (i = 0; i < y->n; i++) {
         y->data[i] = ans[0];
     }
+    free(ans);
+    free(B);
+    free(C);
+    free(recvC);
+    free(tmp);
     
     
   return 0;
@@ -183,6 +188,9 @@ int MatMatMultSumma(Mat A, Mat B, Mat C)
       MPI_Recv(recvB, B->n * B->n, MPI_DOUBLE, i * p + myCol, 2, MPI_COMM_WORLD,&status);
       naive_multiply_add(A->n, recvA, recvB, C->data);
   }
+  free(recvA);
+  free(recvB);
+  free(resultC);
   return 0;
 }
 
