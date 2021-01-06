@@ -21,7 +21,7 @@ int MatMult(Mat A, Vec x, Vec y)
     MPI_Status status;
     MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
-    int p = int(sqrt(num_proc));
+    int p = sqrt(num_proc);
     if (p * p != num_proc) {
         printf("The number of processor should be square!");
         return 0;
@@ -30,7 +30,7 @@ int MatMult(Mat A, Vec x, Vec y)
     double* tmp = (double*)malloc(sizeof(double) * x->n);
     int myRow = myid / p;
     int myCol = myid % p;
-    
+    int i, j, k;
     //每个进程应该把x发送出去
     for (i = 0; i < p; i++) {
         //此处的i表示行
@@ -45,7 +45,7 @@ int MatMult(Mat A, Vec x, Vec y)
     for ( i = 0; i < p; i++) {
         int recvId = myCol * p + i;
         if (recvId != myid) {
-            MPI_Recv(tmp, x->x, MPI_DOUBLE, recvId, 1, MPI_COMM_WORLD, &status);
+            MPI_Recv(tmp, x->n, MPI_DOUBLE, recvId, 1, MPI_COMM_WORLD, &status);
             for (i = 0; i < x->n; i++) {
                 B[k++] = tmp[i];
                 tmp[i] = 0;
@@ -55,7 +55,7 @@ int MatMult(Mat A, Vec x, Vec y)
     if (myid == 0) {
         printf("I'm processor 0:\n");
         for (i = 0; i < k; i++) {
-            printf("%lf\t");
+            printf("%lf\t",B[i]);
         }
         printf("\n");
     }
@@ -242,3 +242,4 @@ int MatMatMultCannon(Mat A, Mat B, Mat C)
 
     return 0;
 }
+//大修改，希望可以保存
