@@ -7,14 +7,14 @@
 #include "vec.h"
 #include "utils.h"
 
-void MatrixMultiply(int* A, int* B, int* C, unsigned m, unsigned n, unsigned p)
+void MatrixMultiply(double* A, double* B, double* C, int m, int n, int p)
 {
     int i, j, k;
     for (i = 0; i < m; i++)
     {
         for (j = 0; j < p; j++)
         {
-            int result = 0;
+            double result = 0;
             for (k = 0; k < n; k++)
             {
                 result = A[i * n + k] * B[k * p + j] + result;
@@ -26,7 +26,7 @@ void MatrixMultiply(int* A, int* B, int* C, unsigned m, unsigned n, unsigned p)
 }
 
 
-void MatrixAdd(int* A, int* B, int m, int n) //the result remain in A
+void MatrixAdd(double* A, double* B, int m, int n) //the result remain in A
 {
     int i, j;
     for (i = 0; i < m; i++) {
