@@ -61,41 +61,30 @@ int MatMult(Mat A, Vec x, Vec y)
     int myCol = myid % p;
     int i, j, k;
     //每个进程应该把x发送出去
-    if (myid == 1) {
-        printf("myid=1:send id=:\n");
-    }
+   
     for (i = 0; i < p; i++) {
         //此处的i表示行
        
         int sendId = i * p + myRow;
-        if (myid == 1) {
-            printf("%d\t",sendId);
-        }
         if (sendId != myid) {
             MPI_Send(x->data,x->n,MPI_DOUBLE,sendId,1,MPI_COMM_WORLD);
         }
     }
     //每个进程都应该接收
     k = 0;
-    if (myid == 1) {
-        printf("\nmyid==1,recvID=:\n");
-    }
-    for ( i = 0; i < p; i++) {
-        
+   
+    for (i = 0; i < p; i++) {   
         int recvId = myCol * p + i;
-        if (myid == 1) {
-            printf("%d\t",recvId);
-        }
         if (recvId != myid) {
             MPI_Recv(tmp, x->n, MPI_DOUBLE, recvId, 1, MPI_COMM_WORLD, &status);
-            for (i = 0; i < x->n; i++) {
-                B[k++] = tmp[i];
+            for (j = 0; j < x->n; j++) {
+                B[k++] = tmp[j];
                 tmp[i] = 0;
             }
         }
         else {
-            for (i = 0; i < x->n; i++) {
-                B[k++] = x->data[i];
+            for (j = 0; j < x->n; j++) {
+                B[k++] = x->data[j];
             }
         }
     }
