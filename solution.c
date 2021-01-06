@@ -47,6 +47,21 @@ int MatMult(Mat A, Vec x, Vec y)
     int p = A->np;
     int myRow = myid / p;
     int myCol = myid % p;
+    if (myid == 1) {
+        printf("A\n");
+        k = 0;
+        for (i = 0; i < A->n; i++) {
+            for (j = 0; j < A->n; j++) {
+                printf("%lf\t",A->data[k++]);
+            }
+        }
+        printf("x\n");
+        k = 0;
+        for (i = 0; i < x->n; i++) {
+            printf("%lf\t", x->data[k++]);
+        }
+        printf("\n");
+    }
     for (i = 0; i < p; i++) {
         MPI_Send(A->data, A->n * A->n, MPI_DOUBLE, myRow * p + i, 1, MPI_COMM_WORLD);
         MPI_Send(x->data, x->n , MPI_DOUBLE, myRow * p + i, 2, MPI_COMM_WORLD);
@@ -59,7 +74,7 @@ int MatMult(Mat A, Vec x, Vec y)
     double* recvx = (double*)malloc(sizeof(double) * x->n);
     double* resultC = (double*)malloc(sizeof(double) * y->n);
 
-    for (i = 0; i < A->n ; i++) {
+    for (i = 0; i < y->n ; i++) {
         resultC[i] = 0;
     }
     //计算矩阵的值
