@@ -64,13 +64,13 @@ int MatMult(Mat A, Vec x, Vec y)
     for (i = 0; i < p; i++) {
         //此处的i表示行
         int sendId = i * p + myRow;
-        if (sendId != myid) {
+        //if (sendId != myid) {
             MPI_Send(x->data,x->n,MPI_DOUBLE,sendId,1,MPI_COMM_WORLD);
-        }
+       // }
     }
     //每个进程都应该接收
     k = 0;
-    for (i = 0; i < x->n; i++)B[k++] = x->data[i];
+   
     for ( i = 0; i < p; i++) {
         int recvId = myCol * p + i;
         if (recvId != myid) {
@@ -79,6 +79,17 @@ int MatMult(Mat A, Vec x, Vec y)
                 B[k++] = tmp[i];
                 tmp[i] = 0;
             }
+        }
+        else {
+            for (i = 0; i < x->n; i++) {
+                B[k++] = x->data[i];
+            }
+        }
+    }
+    if (myid == 1) {
+        printf("MYID==1\n");
+        for (i = 0; i < k; i++) {
+            printf("%lf\t",B[i]);
         }
     }
     //收集对齐以后，使用SUMMA算法
