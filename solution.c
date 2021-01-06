@@ -55,24 +55,37 @@ int MatMult(Mat A, Vec x, Vec y)
         printf("The number of processor should be square!");
         return 0;
     }
-    double* B = (double*)malloc(sizeof(double) * A->n*A->n);
+    double* B = (double*)malloc(sizeof(double) * A->n);
     double* tmp = (double*)malloc(sizeof(double) * x->n);
     int myRow = myid / p;
     int myCol = myid % p;
     int i, j, k;
     //每个进程应该把x发送出去
+    if (myid == 1) {
+        printf("myid=1:send id=:\n");
+    }
     for (i = 0; i < p; i++) {
         //此处的i表示行
+       
         int sendId = i * p + myRow;
-        //if (sendId != myid) {
+        if (myid == 1) {
+            printf("%d\t",sendId);
+        }
+        if (sendId != myid) {
             MPI_Send(x->data,x->n,MPI_DOUBLE,sendId,1,MPI_COMM_WORLD);
-       // }
+        }
     }
     //每个进程都应该接收
     k = 0;
-   
+    if (myid == 1) {
+        printf("\nmyid==1,recvID=:\n");
+    }
     for ( i = 0; i < p; i++) {
+        
         int recvId = myCol * p + i;
+        if (myid == 1) {
+            printf("%d\t",recvId);
+        }
         if (recvId != myid) {
             MPI_Recv(tmp, x->n, MPI_DOUBLE, recvId, 1, MPI_COMM_WORLD, &status);
             for (i = 0; i < x->n; i++) {
@@ -124,8 +137,6 @@ int MatMult(Mat A, Vec x, Vec y)
         }
         printf("\n");
     }
-    
-
   return 0;
 }
 
