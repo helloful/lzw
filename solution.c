@@ -7,29 +7,6 @@
 #include "vec.h"
 #include "utils.h"
 
-void MatrixMultiply(double* A, double* B, double* C, int m, int n, int p)
-{
-    int i, j, k;
-    for (i = 0; i < m; i++) {
-        for (j = 0; j < p; j++) {
-            double result = 0;
-            for (k = 0; k < n; k++) {
-                result = A[i * n + k] * B[k * p + j] + result;
-
-            }
-            C[i * p + j] = result;
-        }
-    }
-}
-void MatrixAdd(double* A, double* B, int m, int n) //the result remain in A
-{
-    int i, j;
-    for (i = 0; i < m; i++) {
-        for (j = 0; j < n; j++) {
-            A[i * n + j] = A[i * n + j] + B[i * n + j];
-        }
-    }
-}
 
 /* y <- Ax
  * - A: matrix
@@ -38,53 +15,52 @@ void MatrixAdd(double* A, double* B, int m, int n) //the result remain in A
  */
 int MatMult(Mat A, Vec x, Vec y)
 {
-   // n*n×n*1=n*1
+    // n*n×n*1=n*1
+    //ps:A->n not equal x->n
     int num_proc, myid;
     MPI_Status status;
     MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
-    int i, j, k;
-    int p = A->np;
+    int p = int(sqrt(num_proc));
+    if (p * p != num_proc) {
+        printf("The number of processor should be square!");
+        return 0;
+    }
+    double* B = (double*)malloc(sizeof(double) * A->n*A->n);
+    double* tmp = (double*)malloc(sizeof(double) * x->n);
     int myRow = myid / p;
     int myCol = myid % p;
-    if (myid == 1) {
-        printf("A\n");
-        k = 0;
-        for (i = 0; i < A->n; i++) {
-            for (j = 0; j < A->n; j++) {
-                printf("%lf\t",A->data[k++]);
+    
+    //每个进程应该把x发送出去
+    for (i = 0; i < p; i++) {
+        //此处的i表示行
+        int sendId = i * p + myRow;
+        if (sendId != myid) {
+            MPI_Send(x->data,x->n,MPI_DOUBLE,sendId,1,MPI_COMM_WORLD);
+        }
+    }
+    //每个进程都应该接收
+    k = 0;
+    for (i = 0; i < x->n; i++)B[k++] = x->data[i];
+    for ( i = 0; i < p; i++) {
+        int recvId = myCol * p + i;
+        if (recvId != myid) {
+            MPI_Recv(tmp, x->x, MPI_DOUBLE, recvId, 1, MPI_COMM_WORLD, &status);
+            for (i = 0; i < x->n; i++) {
+                B[k++] = tmp[i];
+                tmp[i] = 0;
             }
         }
-        printf("x\n");
-        k = 0;
-        for (i = 0; i < x->n; i++) {
-            printf("%lf\t", x->data[k++]);
+    }
+    if (myid == 0) {
+        printf("I'm processor 0:\n");
+        for (i = 0; i < k; i++) {
+            printf("%lf\t");
         }
         printf("\n");
     }
-    for (i = 0; i < p; i++) {
-        MPI_Send(A->data, A->n * A->n, MPI_DOUBLE, myRow * p + i, 1, MPI_COMM_WORLD);
-        MPI_Send(x->data, x->n , MPI_DOUBLE, myRow * p + i, 2, MPI_COMM_WORLD);
+       
 
-        MPI_Send(A->data, A->n * A->n, MPI_DOUBLE, i * p + myCol, 1, MPI_COMM_WORLD);
-        MPI_Send(x->data, x->n, MPI_DOUBLE, i * p + myCol, 2, MPI_COMM_WORLD);
-
-    }
-    double* recvA = (double*)malloc(sizeof(double) * A->n * A->n);
-    double* recvx = (double*)malloc(sizeof(double) * x->n);
-    double* resultC = (double*)malloc(sizeof(double) * y->n);
-
-    for (i = 0; i < y->n ; i++) {
-        resultC[i] = 0;
-    }
-    //计算矩阵的值
-    for (i = 0; i < p; i++) {
-        MPI_Recv(recvA, A->n * A->n, MPI_DOUBLE, myRow * p + i, 1, MPI_COMM_WORLD, &status);
-        MPI_Recv(recvx, x->n, MPI_DOUBLE, i * p + myCol, 2, MPI_COMM_WORLD, &status);
-        MatrixMultiply(recvA, recvx, resultC, A->n, A->n, 1);
-        MatrixAdd(y->data, resultC, A->n, 1);
-    }
-  
   return 0;
 }
 
