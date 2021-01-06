@@ -125,12 +125,10 @@ int MatMult(Mat A, Vec x, Vec y)
             }
         }
     }
-    if (myid == 0) {
-        printf("ID=0:\n");
-        for (int i = 0; i < A->n; i++) {
-            printf("%lf\t",ans[i]);
-        }
+    for (i = 0; i < y->n; i++) {
+        y->data[i] = ans[0];
     }
+    
     
   return 0;
 }
