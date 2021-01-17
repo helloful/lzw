@@ -132,11 +132,12 @@ class Client():
             wf.close()
     def gameStart(self):
         self.START_AUDIO=True
-        self.audio.start()
+        # self.audio.start()
 
 
     def gameOver(self):
-        self.window.quit()
+        self.window.exit()
+        # self.window.quit()
 
     def addLib(self):
         key = self.input1.get()
@@ -156,6 +157,7 @@ class Client():
         f=open("tmp.txt","w")
         f.write(str(dic_name))
         f.close()
+        tk.messagebox.showinfo('提示', '添加成功！')
         # print(dic_name)
 
     def deleteLib(self):
@@ -169,8 +171,9 @@ class Client():
         f.write(str(dic_name))
         f.close()
 
-        print("删除库")
-        print(dic_name)
+        # print("删除库")
+        # print(dic_name)
+        tk.messagebox.showinfo('提示', '删除成功！')
 
     def initGUI(self):
         self.window = tk.Tk()
@@ -210,10 +213,12 @@ class Client():
         text = self.XF_text(in_path, 16000)
         self.string_client(text)
     def initThread(self):
-        self.guiThread = threading.Thread(target=self.initGUI)
-        self.audio = threading.Thread(target=self.mymain)
+        pass
+        # self.guiThread = threading.Thread(target=self.initGUI)
+        # self.audio = threading.Thread(target=self.mymain)
     def start(self):
-        self.guiThread.start()
+        self.initGUI()
+        # self.guiThread.start()
         # self.mymain()
 
         # self.audio.start()
