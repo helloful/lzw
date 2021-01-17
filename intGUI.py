@@ -208,15 +208,16 @@ class Client():
         while True:
             get_audio(in_path)
             text = XF_text(in_path, 16000)
-            string_client(text)
+            # string_client(text)
     def initThread(self):
         self.guiThread = threading.Thread(target=self.initGUI)
-        self.audio = threading.Thread(target=self.main)
+        self.audio = threading.Thread(target=self.mymain)
     def start(self):
         self.guiThread.start()
-        self.mymain()
+        self.audio.start()
+        # self.mymain()
+
         # self.audio.start()
-        
 
 
 
