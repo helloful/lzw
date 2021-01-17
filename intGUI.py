@@ -204,7 +204,7 @@ class Client():
 
 
         self.window.mainloop()
-    def main(self):
+    def mymain(self):
         while True:
             get_audio(in_path)
             text = XF_text(in_path, 16000)
@@ -214,7 +214,9 @@ class Client():
         self.audio = threading.Thread(target=self.main)
     def start(self):
         self.guiThread.start()
-        self.audio.start()
+        self.mymain()
+        # self.audio.start()
+        
 
 
 
