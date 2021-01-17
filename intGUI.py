@@ -1,5 +1,6 @@
 import threading
 import tkinter as tk
+import tkinter.messagebox
 import rospy
 from std_srvs.srv import SetBool, SetBoolRequest
 from ctypes import *
@@ -136,7 +137,7 @@ class Client():
 
 
     def gameOver(self):
-        self.window.exit()
+        self.window.destroy()
         # self.window.quit()
 
     def addLib(self):
@@ -157,7 +158,7 @@ class Client():
         f=open("tmp.txt","w")
         f.write(str(dic_name))
         f.close()
-        tk.messagebox.showinfo('提示', '添加成功！')
+        tkinter.messagebox.showinfo('提示', '添加成功！')
         # print(dic_name)
 
     def deleteLib(self):
@@ -173,7 +174,7 @@ class Client():
 
         # print("删除库")
         # print(dic_name)
-        tk.messagebox.showinfo('提示', '删除成功！')
+        tkinter.messagebox.showinfo('提示', '删除成功！')
 
     def initGUI(self):
         self.window = tk.Tk()
