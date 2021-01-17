@@ -138,7 +138,8 @@ class Client():
 
 
     def gameOver(self):
-        self.window.destroy()
+        exit(0)
+        # self.window.destroy()
         # self.window.quit()
 
     def addLib(self):
