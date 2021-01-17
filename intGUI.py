@@ -133,6 +133,7 @@ class Client():
             wf.close()
     def gameStart(self):
         self.START_AUDIO=True
+        self.mymain()
         # self.audio.start()
 
 
